@@ -15,15 +15,81 @@ class GoogleSheetAPi {
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/flutter-g-sheets%40tactical-sonar-416314.iam.gserviceaccount.com",
   "universe_domain": "googleapis.com"
 }
-
 ''';
 
   static final _spreadsheetid = '1TTIBqE4qyHHEKUOmmTU11P9fbsmRpuGr6C9jP3Ainpw';
   static final _gsheet = GSheets(_credentials);
   static Worksheet? _worksheet;
 
+  //some variable to keep track of
+  static int numberOfTransaction = 0;
+  static List<List<dynamic>> currentTransaction = [];
+  static bool loading = true;
+
   Future init() async {
     final ss = await _gsheet.spreadsheet(_spreadsheetid);
     _worksheet = ss.worksheetByTitle('Worksheet1');
+    countRows();
+  }
+
+  static Future countRows() async {
+    while ((await _worksheet!.values
+            .value(column: 1, row: numberOfTransaction + 1)) !=
+        '') {
+      numberOfTransaction++;
+    }
+    loadTransaction();
+  }
+
+  static Future loadTransaction() async {
+    if (_worksheet == null) return;
+    for (int i = 1; i < numberOfTransaction; i++) {
+      final String transactionName =
+          await _worksheet!.values.value(column: 1, row: i + 1);
+      final String transactionAmount =
+          await _worksheet!.values.value(column: 2, row: i + 1);
+      final String transactionType =
+          await _worksheet!.values.value(column: 3, row: i + 1);
+
+      if (currentTransaction.length < numberOfTransaction) {
+        currentTransaction
+            .add([transactionName, transactionAmount, transactionType]);
+      }
+    }
+
+    // print('print test+$currentTransaction');
+
+    loading = false;
+  }
+
+  static Future insert(String name, String amount, bool _isInCome) async {
+    if (_worksheet == null) return;
+    numberOfTransaction++;
+    currentTransaction
+        .add([name, amount, _isInCome == true ? 'income' : 'expense']);
+    await _worksheet!.values
+        .appendRow([name, amount, _isInCome == true ? 'income' : 'expense']);
+  }
+
+  static double calculateIncome() {
+    double totalIncome = 0;
+    for (int i = 0; i < currentTransaction.length; i++) {
+      if (currentTransaction[i][2] == 'income') {
+        totalIncome += double.parse(currentTransaction[i][1]);
+      }
+    }
+
+    return totalIncome;
+  }
+
+  static double calculateExpense() {
+    double totalExpensis = 0;
+    for (int i = 0; i < currentTransaction.length; i++) {
+      if (currentTransaction[i][2] == 'expense') {
+        totalExpensis+= double.parse(currentTransaction[i][1]);
+      }
+    }
+
+    return totalExpensis;
   }
 }
